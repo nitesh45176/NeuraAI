@@ -37,7 +37,8 @@ def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
     audio = AudioSegment.from_file(input_path)
-    audio = audio.set_channels(1).set_frame_rate(16000) #16khz 
+    audio = audio.set_channels(1).set_frame_rate(16000) #16khz, why only 16KHz? 16kHz: common speech-recognition sample rate.
+
     audio.export(output_path, format="wav")
     return output_path
 

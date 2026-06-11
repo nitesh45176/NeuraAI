@@ -2,7 +2,7 @@
 
 import api from "@/lib/api";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type Message = {
   question: string;
@@ -24,7 +24,10 @@ export default function ChatPage() {
   const router = useRouter();
   const jobId = String(params.jobId);
 
-  async function sendQuestion(event?: FormEvent<HTMLFormElement>, prompt?: string) {
+  async function sendQuestion(
+    event?: FormEvent<HTMLFormElement>,
+    prompt?: string,
+  ) {
     event?.preventDefault();
 
     const query = (prompt ?? question).trim();
@@ -54,6 +57,31 @@ export default function ChatPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    const loadhistory = async () => {
+      try {
+        const res = await api.get(`/chat/${jobId}`);
+
+        const history = res.data.chat_history || [];
+
+        const formattedMessages: Message[] = [];
+
+        for (let i = 0; i < history.length; i += 2) {
+          formattedMessages.push({
+            question: history[i]?.content || "",
+            answer: history[i + 1]?.content || "",
+          });
+        }
+
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    loadhistory();
+  }, [jobId]);
 
   return (
     <main className="min-h-screen bg-[#f7f3ea] text-[#17211f]">

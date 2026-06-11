@@ -42,7 +42,7 @@ TRANSCRIPT:
 {transcript}
 """
 
-    rag_chain = build_rag_chain(knowledge)
+    rag_chain = build_rag_chain(knowledge)      
 
     return {
         "title": title,
@@ -52,3 +52,7 @@ TRANSCRIPT:
         "key_decisions": decisions,
         "open_questions": questions,
     }
+    
+    ## RAG chain is not returned because:-
+     #  Your pipeline should return only the information the frontend needs:
+     #  The RAG chain is an internal implementation detail, not API data.

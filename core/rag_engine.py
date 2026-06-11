@@ -16,67 +16,46 @@ def get_llm():
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
+def format_chat_history(history):
+    return "\n".join(
+        [f"{msg['role']}: {msg['content']}" for msg in history[-6:]]
+    )
+
 def build_rag_chain(knowledge: str):
     vector_Store = build_vector_Store(knowledge)
     retriever = get_retriever(vector_Store, k=4)
 
     
     llm = get_llm()
-    prompt = ChatPromptTemplate.from_messages(
+    prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        """You are an expert meeting assistant.
 
-        [(
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
+Use the previous conversation only to understand follow-up questions.
+Use the meeting transcript context as the source of truth.
 
-If the answer is not found in the context, say: 
+If the answer is not found in the meeting transcript context, say:
 "I could not find this information in the meeting transcript."
 
-Always be concise and precise. If quoting someone, mention it clearly.
+Be concise, precise, and do not make up information.
 
-Context from meeting transcript:
-{context}""",
-        ),
-        ("human", "{question}"),
-    ]
-    )
+Previous conversation:
+{chat_history}
+
+Meeting transcript context:
+{context}
+"""
+    ),
+    ("human", "{question}")
+])
 
     ## full LCEL Rag pipeline
     rag_chain = (
-        {"context": retriever | RunnableLambda(format_docs),
-         "question": RunnablePassthrough()}
-         | prompt| llm | StrOutputParser()
-    )
-
-    return rag_chain
-
-
-def load_rag_chain():
-    vector_store = load_vector_Store()
-    retriver = get_retriever(vector_store, k=4)
-
-    llm = get_llm()
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
-
-If the answer is not found in the context, say: 
-"I could not find this information in the meeting transcript."
-
-Always be concise and precise. If quoting someone, mention it clearly.
-
-Context from meeting transcript:
-{context}""",
-        ),
-        ("human", "{question}"),
-    ])
-
-    rag_chain = (
         {
-            "context":  retriver| RunnableLambda(format_docs),
-            "question": RunnablePassthrough(),
+            "context": RunnableLambda(lambda x:x ["question"]) |  retriever| RunnableLambda(format_docs),    ## Ab runnableLambda me do chije hai :- question and chat_history and we want to give only question to the llm so will send question specifically using RunnableLambda
+            "question": RunnableLambda(lambda x:x ["question"]),
+             "chat_history": RunnableLambda(lambda x:  format_chat_history(x["chat_history"]))
         }
         | prompt
         | llm
@@ -86,8 +65,54 @@ Context from meeting transcript:
     return rag_chain
 
 
-def ask_question(rag_chain, question:str) -> str:
+def load_rag_chain():
+   
+    vector_store = load_vector_Store()
+    retriever = get_retriever(vector_store, k=4)     ## Then it creates a retriever that fetches the top 4 relevant chunks. 
+
+    llm = get_llm()
+    prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        """You are an expert meeting assistant.
+
+Use the previous conversation only to understand follow-up questions.
+Use the meeting transcript context as the source of truth.
+
+If the answer is not found in the meeting transcript context, say:
+"I could not find this information in the meeting transcript."
+
+Be concise, precise, and do not make up information.
+
+Previous conversation:
+{chat_history}
+
+Meeting transcript context:
+{context}
+"""
+    ),
+    ("human", "{question}")
+])
+
+    rag_chain = (
+        {
+            "context": RunnableLambda(lambda x:x ["question"]) |  retriever| RunnableLambda(format_docs),    ## Ab runnableLambda me do chije hai :- question and chat_history and we want to give only question to the llm so will send question specifically using RunnableLambda
+            "question": RunnableLambda(lambda x:x ["question"]),
+             "chat_history": RunnableLambda(lambda x:  format_chat_history(x["chat_history"]))
+        }
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    return rag_chain
+
+
+def ask_question(rag_chain, question:str, chat_history: list) -> str:
     print(f"Question : {question}")
-    answer = rag_chain.invoke(question)
+    answer = rag_chain.invoke({
+        "question": question,
+        "chat_history": chat_history}
+    )
     print(f"answer :{answer}")
     return answer

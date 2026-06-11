@@ -110,15 +110,36 @@ def chat_with_meeting(
             "error": "Meeting processing not completed"
         }
 
-    transcript = job["result"]["transcript"]
+    history = job.get("chat_history", [])
 
     rag_chain = load_rag_chain()
 
     answer = ask_question(
         rag_chain,
-        data.query
+        data.query,
+        history
     )
+    
+    history.append({"role": "user", "content": data.query})
+    history.append({"role": "assistant", "content": answer})
+
+    update_job(job_id, chat_history=history)
 
     return {
-        "answer": answer
+        "answer": answer,
+        "chat_history": history
     }
+
+
+@router.get("/chat/${job_id}")
+def get_chat_history(job_id: str):
+
+    job = get_job(job_id)
+
+    if not job:
+        raise HTTPException(
+            status_code= 404,
+            detail="Job not found"
+        )
+    
+    return {"chat_history": job.get("chat_history", [])}
